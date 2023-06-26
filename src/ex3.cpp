@@ -37,15 +37,24 @@ typedef struct
 /* Global Variables */
 /* ===================================================================== */
 
-std::map<ADDRINT, LOOP_DATA> loops;
-std::map<ADDRINT, UINT64> rtn_ins_counts;
-map<ADDRINT, UINT64> rtn_call_counts;
+std::map <ADDRINT, LOOP_DATA> loops;
+std::map <ADDRINT, UINT64> rtn_ins_counts;
+map <ADDRINT, UINT64> rtn_call_counts;
+
+/* ===================================================================== */
+/* Configuration */
+/* ===================================================================== */
+
+KNOB <BOOL> prof_mode(KNOB_MODE_WRITEONCE, "pintool", "prof", "0",
+                      "Run in profile mode");
+KNOB <BOOL> inst_mode(KNOB_MODE_WRITEONCE, "pintool", "inst", "0",
+                      "Run in probe mode");
 
 /* ===================================================================== */
 /*Call funcations*/
 /* ===================================================================== */
 
-VOID /*PIN_FAST_ANALYSIS_CALL*/ count_rtn_ins(uint32_t* counter, uint32_t amount)
+VOID /*PIN_FAST_ANALYSIS_CALL*/ count_rtn_ins(uint32_t * counter, uint32_t amount)
 {
     (*counter) += amount;
 }
@@ -80,7 +89,7 @@ VOID count_rtn_call(ADDRINT addr)
 
 /* ===================================================================== */
 
-VOID Trace(TRACE trace, VOID* v)
+VOID Trace(TRACE trace, VOID * v)
 {
     BBL bbl = TRACE_BblHead(trace);
     INS ins_tail = BBL_InsTail(bbl);
@@ -138,7 +147,7 @@ VOID Trace(TRACE trace, VOID* v)
     }
 }
 
-VOID instrument_routine(RTN rtn, VOID* v)
+VOID instrument_routine(RTN rtn, VOID * v)
 {
     RTN_Open(rtn);
     RTN_InsertCall(rtn, IPOINT_AFTER, (AFUNPTR)count_rtn_call,
@@ -164,7 +173,7 @@ INT32 Usage()
 
 /* ===================================================================== */
 
-VOID Fini(INT32 code, VOID* v)
+VOID Fini(INT32 code, VOID * v)
 {
     ofstream to("loop-count.csv");
     if (!to)
@@ -173,7 +182,7 @@ VOID Fini(INT32 code, VOID* v)
         return;
     }
 
-    std::multimap<UINT32, LOOP_DATA> sorted_loops_map;
+    std::multimap <UINT32, LOOP_DATA> sorted_loops_map;
 
     for (std::map<ADDRINT, LOOP_DATA>::const_iterator it = loops.begin(); it != loops.end(); ++it)
     {
@@ -202,19 +211,34 @@ VOID Fini(INT32 code, VOID* v)
 /* Main                                                                  */
 /* ===================================================================== */
 
-int main(int argc, char* argv[])
+int main(int argc, char * argv[])
 {
     if (PIN_Init(argc, argv))
     {
         return Usage();
     }
 
-    PIN_InitSymbols();
-    TRACE_AddInstrumentFunction(Trace, 0);
-    RTN_AddInstrumentFunction(instrument_routine, 0);
-    PIN_AddFiniFunction(Fini, 0);
-    // Never returns
-    PIN_StartProgram();
+    if (prof_mode)
+    {
+        cout << "prof mode" << endl;
+        PIN_InitSymbols();
+        TRACE_AddInstrumentFunction(Trace, 0);
+        RTN_AddInstrumentFunction(instrument_routine, 0);
+        PIN_AddFiniFunction(Fini, 0);
+
+        // Never returns
+        PIN_StartProgram();
+    }
+    else if (inst_mode)
+    {
+        cout << "inst mode" << endl;
+        return 0;
+    }
+    else
+    {
+        return Usage();
+    }
+
     return 0;
 }
 
